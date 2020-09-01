@@ -1,3 +1,16 @@
+# Directories
+.vscode
+wandb
+lda2vec_modelling
+mallet*
+model
+notebooks
+
+*.pdf
+*test*
+*.csv
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
