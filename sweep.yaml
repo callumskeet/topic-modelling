@@ -6,13 +6,9 @@ parameters:
   alpha:
     distribution: categorical
     values:
-    - symmetric
     - auto
   chunksize:
     values:
-    - 100
-    - 500
-    - 1000
     - 2000
   decay:
     values:
@@ -26,16 +22,12 @@ parameters:
     - auto
   iterations:
     values:
-    - 100
-    - 200
-    - 300
     - 400
   no_above:
     values:
     - 0.7
-    - 0.6
     - 0.5
-    - 0.4
+    - 0.3
   no_below:
     values:
     - 5
@@ -48,26 +40,13 @@ parameters:
     - 6
     - 7
     - 8
-    - 9
-    - 10
-    - 11
-    - 12
   offset:
     values:
-    - 1
-    - 64
-    - 256
     - 1024
   passes:
     values:
-    - 1
-    - 5
-    - 10
     - 20
   random_state:
     values:
-    - 100
-    - 67
-    - 33
     - 1024
 program: train.py
