@@ -1,0 +1,73 @@
+method: grid
+metric:
+  goal: maximize
+  name: coherence
+parameters:
+  alpha:
+    distribution: categorical
+    values:
+    - symmetric
+    - auto
+  chunksize:
+    values:
+    - 100
+    - 500
+    - 1000
+    - 2000
+  decay:
+    values:
+    - 0.5
+    - 0.7
+    - 0.8
+    - 0.9
+  eta:
+    distribution: categorical
+    values:
+    - auto
+  iterations:
+    values:
+    - 100
+    - 200
+    - 300
+    - 400
+  no_above:
+    values:
+    - 0.7
+    - 0.6
+    - 0.5
+    - 0.4
+  no_below:
+    values:
+    - 5
+    - 10
+    - 20
+  num_topics:
+    values:
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+  offset:
+    values:
+    - 1
+    - 64
+    - 256
+    - 1024
+  passes:
+    values:
+    - 1
+    - 5
+    - 10
+    - 20
+  random_state:
+    values:
+    - 100
+    - 67
+    - 33
+    - 1024
+program: train.py
