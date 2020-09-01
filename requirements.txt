@@ -1,0 +1,4 @@
+pandas
+gensim
+graphql-core==1.1
+wandb==0.9.5
