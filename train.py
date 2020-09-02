@@ -7,33 +7,71 @@ import argparse
 import logging
 logging.basicConfig(
     format='%(asctime)s : %(levelname)s : %(message)s', 
-    level=logging.NOTSET)
+    level=logging.INFO)
 
 import wandb
 import gensim
 import pandas as pd
 
+import plotly.express as px
+import pyLDAvis
+import pyLDAvis.gensim
+
 from gensim.models import CoherenceModel, LdaModel, LdaMulticore
-from gensim.models.callbacks import CoherenceMetric, ConvergenceMetric, Callback
+from gensim.models.callbacks import CoherenceMetric, ConvergenceMetric, PerplexityMetric, DiffMetric
 from gensim.corpora import Dictionary
-from pprint import pprint
 
 
-# class ConvergenceCallback(Callback):
+class ConvergenceCallback(ConvergenceMetric):
 
-#     def __init__(self):
-#         super().__init__([ConvergenceMetric()])
-#         self.epoch = 0
-#         self.logger = None
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.epoch = 0
 
-#     def get_value(self, **kwargs):
-#         with open('test.log', 'w+') as f:
-#             f.write(model.alpha)
-#             f.write(',')
-#             f.write(model.eta)
-#             f.write('\n')
-#         self.epoch += 1
+    def get_value(self, **kwargs):
+        value = super().get_value(**kwargs)
+        wandb.log({'convergence': value}, step=self.epoch)
+        self.epoch += 1
+        return value
 
+
+class CoherenceCallback(CoherenceMetric):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.epoch = 0
+
+    def get_value(self, **kwargs):
+        value = super().get_value(**kwargs)
+        wandb.log({'coherence': value}, step=self.epoch)
+        self.epoch += 1
+        return value
+
+
+class PerplexityCallback(PerplexityMetric):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.epoch = 0
+
+    def get_value(self, **kwargs):
+        value = super().get_value(**kwargs)
+        wandb.log({'perplexity': value}, step=self.epoch)
+        self.epoch += 1
+        return value
+
+
+class DiffCallback(DiffMetric):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.epoch = 0
+
+    def get_value(self, **kwargs):
+        value = super().get_value(**kwargs)
+        wandb.log({'topic_diff': value}, step=self.epoch)
+        self.epoch += 1
+        return value
 
 
 def build_texts(fname):
@@ -82,56 +120,6 @@ def process_texts(texts, ngram_model=None, stop_words=None):
     return texts
 
 
-def evaluate_lda_models(dictionary, corpus, texts, limit):
-    """
-    Function to display num_topics - LDA graph using c_v coherence
-    
-    Parameters:
-    ----------
-    dictionary : Gensim dictionary
-    corpus : Gensim corpus
-    limit : topic limit
-    
-    Returns:
-    -------
-    lm_list : List of LDA topic models
-    c_v : Coherence values corresponding to the LDA model with respective number of topics
-    """
-    c_v = []
-    lm_list = []
-    for num_topics in range(1, limit):
-        lm = LdaMulticore(corpus=corpus, num_topics=num_topics, id2word=dictionary, passes=10)
-        lm_list.append(lm)
-        cm = CoherenceModel(model=lm, texts=texts, dictionary=dictionary, coherence='c_v')
-        c_v.append(cm.get_coherence())
-    
-    return lm_list, c_v
-
-
-def ret_top_model(texts, corpus, dictionary):
-    """
-    Since LDA is a probabilistic model, it comes up different topics each time we run it. To control the
-    quality of the topic model we produce, we can see what the interpretability of the best topic is and keep
-    evaluating the topic model until this threshold is crossed. 
-    
-    Returns:
-    -------
-    lm: Final evaluated topic model
-    top_topics: ranked topics in decreasing order. List of tuples
-    """
-    top_topics = [(0, 0)]
-    while top_topics[0][1] < 0.6:
-        lm = LdaMulticore(corpus=corpus, id2word=dictionary, workers=3, num_topics=9)
-        coherence_values = {}
-        for n, topic in lm.show_topics(num_topics=-1, formatted=False):
-            topic = [word for word, _ in topic]
-            cm = CoherenceModel(topics=[topic], texts=texts, dictionary=dictionary, window_size=10)
-            coherence_values[n] = cm.get_coherence()
-        top_topics = sorted(coherence_values.items(), key=operator.itemgetter(1), reverse=True)
-        print(top_topics[0])
-    return lm, top_topics
-
-
 def save_objects():
     train_texts = list(build_texts('feedback.csv'))
     bigram = gensim.models.Phrases(train_texts)  # for bigram collocation detection
@@ -172,44 +160,41 @@ def get_text_inputs_from_folder(directory):
     return train_texts, bigram, dictionary
 
 
-def get_default_hyperparameters():
+def get_hyperparameters(passes=20, iterations=400, decay=0.5, offset=1024, chunksize=2000, alpha='auto', 
+                        eta='auto', random_state=1024, num_topics=7, no_below=None, no_above=None):
     return dict(
-        passes = 20,
-        iterations = 400,
-        decay = 0.5,
-        offset = 1,
-        chunksize = 2000,
-        alpha='auto',
-        eta='auto',
-        random_state = 123,
-        num_topics = 6,
-        no_below=5,
-        no_above=0.5
+        passes = passes,
+        iterations = iterations,
+        decay = decay,
+        offset = offset,
+        chunksize = chunksize,
+        alpha = alpha,
+        eta = eta,
+        random_state = random_state,
+        num_topics = num_topics,
+        no_below = no_below,
+        no_above = no_above
     )
 
 
-def get_kwargs(argv):
-    kwargs = dict()
-    for arg in argv[1:]:
-        name, value = arg.strip('--').split('=')
-        kwargs[name] = value
-    return kwargs
-
-
-def train(passes, iterations, num_topics, decay, offset, chunksize, alpha, eta, random_state, no_below, no_above):
+def train(passes=1, iterations=50, num_topics=100, decay=0.5, offset=1.0, chunksize=2000, 
+          alpha='symmetric', eta=None, random_state=None, no_below=None, no_above=None):
+    
     texts, _, dictionary = get_text_inputs_from_folder('model')
 
-    dictionary.filter_extremes(no_above=no_above, no_below=no_below)
+    if no_above or no_below:
+        dictionary.filter_extremes(no_above=no_above, no_below=no_below)
     corpus = [dictionary.doc2bow(text) for text in texts]
 
-    convergence_logger = ConvergenceMetric(logger='shell')
-    coherence_logger = CoherenceMetric(logger='shell', corpus=corpus, texts=texts, dictionary=dictionary, coherence='c_v')
+    convergence_logger = ConvergenceCallback(logger='shell')
+    coherence_logger = CoherenceCallback(logger='shell', corpus=corpus, texts=texts, dictionary=dictionary, coherence='c_v')
+    perplexity_logger = PerplexityCallback(logger='shell', corpus=corpus)
 
     lm = LdaModel(
         corpus=corpus, 
         id2word=dictionary, 
         eval_every=1, 
-        callbacks=[convergence_logger, coherence_logger],
+        callbacks=[convergence_logger, coherence_logger, perplexity_logger],
         passes=passes,
         iterations=iterations,
         num_topics=num_topics,
@@ -220,19 +205,11 @@ def train(passes, iterations, num_topics, decay, offset, chunksize, alpha, eta, 
         eta=eta,
         random_state=random_state
     )
-    
-    lm.save(os.path.join(wandb.run.dir, f'lda_{num_topics}t.model'))
 
-    cm = CoherenceModel(
-        model=lm, 
-        texts=texts, 
-        coherence='c_v')
-
-    coherence = cm.get_coherence()
-    wandb.log({'coherence': coherence})
+    return lm, corpus, dictionary
 
 
-if __name__ == "__main__":
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--alpha", type=str)
     parser.add_argument("--chunksize", type=int)
@@ -245,8 +222,35 @@ if __name__ == "__main__":
     parser.add_argument("--offset", type=int)
     parser.add_argument("--passes", type=int)
     parser.add_argument("--random_state", type=int)
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    hyperparameters = vars(args)
+
+def main():
+    hyperparameters = get_hyperparameters()
+    if len(sys.argv) > 1:
+        args = vars(parse_args())
+        args = {k: v for k, v in args.items() if v is not None}
+        hyperparameters.update(args)
+
     wandb.init(project="bom-topic-modelling", config=hyperparameters)
-    train(**hyperparameters)
+
+    lm, corpus, dictionary = train(**hyperparameters)
+
+    wandb.run.save()
+    save_dir = os.path.join('model', wandb.run.name)
+    os.mkdir(save_dir)
+    lm.save(os.path.join(save_dir, 'lda.model'))
+    
+    # topic difference heatmap
+    mdiff, _ = lm.diff(lm, distance='jaccard', num_words=50)
+    fig = px.imshow(mdiff, origin='lower', color_continuous_scale='RdBu_r')
+    wandb.log({"topic_diff": fig})
+    
+    # pyLDAvis
+    vis = pyLDAvis.gensim.prepare(lm, corpus, dictionary)
+    html = pyLDAvis.prepared_data_to_html(vis)
+    wandb.log({"pyLDAvis": wandb.Html(html, inject=False)})
+
+
+if __name__ == "__main__":
+    main()
