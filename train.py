@@ -1,8 +1,6 @@
 import sys
 import os
 import re
-import operator
-import warnings
 import argparse
 import logging
 logging.basicConfig(
@@ -10,16 +8,16 @@ logging.basicConfig(
     level=logging.INFO)
 
 import wandb
-import gensim
 import pandas as pd
 
-import plotly.express as px
-import pyLDAvis
-import pyLDAvis.gensim
-
-from gensim.models import CoherenceModel, LdaModel, LdaMulticore
+import gensim
+from gensim.models import LdaModel
 from gensim.models.callbacks import CoherenceMetric, ConvergenceMetric, PerplexityMetric, DiffMetric
 from gensim.corpora import Dictionary
+
+import pyLDAvis
+import pyLDAvis.gensim
+import plotly.express as px
 
 
 class ConvergenceCallback(ConvergenceMetric):
@@ -236,10 +234,7 @@ def main():
 
     lm, corpus, dictionary = train(**hyperparameters)
 
-    wandb.run.save()
-    save_dir = os.path.join('model', wandb.run.name)
-    os.mkdir(save_dir)
-    lm.save(os.path.join(save_dir, 'lda.model'))
+    lm.save(os.path.join(wandb.run.dir, 'lda.model'))
     
     # topic difference heatmap
     mdiff, _ = lm.diff(lm, distance='jaccard', num_words=50)
