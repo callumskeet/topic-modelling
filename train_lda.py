@@ -9,6 +9,7 @@ logging.basicConfig(
 
 import wandb
 import pandas as pd
+import utils
 
 import gensim
 from gensim.models import LdaModel
@@ -72,113 +73,27 @@ class DiffCallback(DiffMetric):
         return value
 
 
-def build_texts(fname):
-    """
-    Function to build tokenized texts from file
-    
-    Parameters:
-    ----------
-    fname: File to be read
-    
-    Returns:
-    -------
-    yields preprocessed line
-    """
-    df = pd.read_csv(fname)
-    data = df['Brief Description']
-    data = data.dropna()
-    mask = data.str.contains(r'^no comment$|^comment not applicable')
-    data = data[~mask]
-    data = data.unique()
-    for line in data:
-        yield gensim.utils.simple_preprocess(line, deacc=True, min_len=3)
-
-
-def process_texts(texts, ngram_model=None, stop_words=None):
-    """
-    Function to process texts. The following steps are taken:
-    
-    1. Collocation detection.
-    2. Stopword removal.
-    
-    Parameters:
-    ----------
-    texts: Tokenized texts
-    ngram_model: gensim Phrases model to generate n_grams from texts
-    remove_stop_words: boolean value
-    
-    Returns:
-    -------
-    texts: Pre-processed tokenized texts
-    """
-    if ngram_model:
-        texts = [ngram_model[line] for line in texts]
-    if stop_words:
-        texts = [[word for word in line if word not in stop_words] for line in texts]
-    return texts
-
-
-def save_objects():
-    train_texts = list(build_texts('feedback.csv'))
-    bigram = gensim.models.Phrases(train_texts)  # for bigram collocation detection
-    bigram.save(os.path.join('model', 'bigram.pkl'))
-
-    train_texts = process_texts(train_texts, bigram)
-    with open(os.path.join('model', 'texts.txt'), 'w') as f:
-        for doc in train_texts:
-            f.write(','.join(doc) + '\n')
-
-    dictionary = Dictionary(train_texts)
-    dictionary.save(os.path.join('model', 'dictionary.pkl'))
-
-
-def get_text_inputs_from_folder(directory):
-    """
-    Retrieves documents, bigram and dictionary from the specified directory.
-
-    Parameters:
-    ----------
-    directory: The directory containing the text inputs. 
-               Expects the following files: texts.txt, bigram.pkl, dictionary.pkl
-    
-    Returns:
-    -------
-    train_texts
-    bigram
-    dictionary
-    corpus
-    """
-    with open(os.path.join(directory, 'texts.txt'), 'r') as f:
-        train_texts = [line.strip().split(',') for line in f.readlines()]
-        
-    bigram = gensim.models.Phrases.load(os.path.join('model', 'bigram.pkl'))
-    train_texts = process_texts(train_texts, bigram)
-
-    dictionary = Dictionary.load(os.path.join('model', 'dictionary.pkl'))
-    return train_texts, bigram, dictionary
-
-
-def get_hyperparameters(passes=20, iterations=400, decay=0.5, offset=1024, chunksize=2000, alpha='auto', 
-                        eta='auto', random_state=1024, num_topics=7, no_below=None, no_above=None):
+def get_hyperparameters():
     return dict(
-        passes = passes,
-        iterations = iterations,
-        decay = decay,
-        offset = offset,
-        chunksize = chunksize,
-        alpha = alpha,
-        eta = eta,
-        random_state = random_state,
-        num_topics = num_topics,
-        no_below = no_below,
-        no_above = no_above
+        passes = 10,
+        iterations = 400,
+        decay = 0.7,
+        offset = 1024,
+        chunksize = 2000,
+        alpha = 'auto',
+        eta = 'auto',
+        random_state = 1024,
+        num_topics = 7,
+        minimum_probability = 0.01,
+        no_below = None,
+        no_above = None
     )
 
 
-def train(passes=1, iterations=50, num_topics=100, decay=0.5, offset=1.0, chunksize=2000, 
+def train(passes=1, iterations=50, num_topics=100, decay=0.5, offset=1.0, chunksize=2000, minimum_probability=0.01,
           alpha='symmetric', eta=None, random_state=None, no_below=None, no_above=None):
     
-    texts, _, dictionary = get_text_inputs_from_folder('model')
+    texts, _, dictionary = utils.get_text_inputs_from_folder('model')
 
     if no_above or no_below:
         dictionary.filter_extremes(no_above=no_above, no_below=no_below)
@@ -201,7 +116,8 @@ def train(passes=1, iterations=50, num_topics=100, decay=0.5, offset=1.0, chunks
         chunksize=chunksize,
         alpha=alpha,
         eta=eta,
-        random_state=random_state
+        random_state=random_state,
+        minimum_probability=minimum_probability,
     )
 
     return lm, corpus, dictionary
@@ -220,6 +136,7 @@ def parse_args():
     parser.add_argument("--offset", type=int)
     parser.add_argument("--passes", type=int)
     parser.add_argument("--random_state", type=int)
+    parser.add_argument("--minimum_probability", type=float)
     return parser.parse_args()
 
 

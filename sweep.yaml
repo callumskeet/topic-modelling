@@ -1,43 +1,14 @@
-method: grid
+method: bayes
 metric:
   goal: maximize
   name: coherence
 parameters:
-  alpha:
-    distribution: categorical
-    values:
-    - auto
-  chunksize:
-    values:
-    - 10
-    - 100
-    - 500
-    - 1000
-    - 2000
-  decay:
-    values:
-    - 0.9
-  eta:
-    distribution: categorical
-    values:
-    - auto
-  iterations:
-    values:
-    - 400
+  minimum_probability:
+    distribution: uniform
+    max: 0.5
+    min: 0.01
   num_topics:
-    values:
-    - 7
-    - 14
-    - 21
-  offset:
-    values:
-    - 1024
-    - 2048
-    - 4096
-  passes:
-    values:
-    - 20
-  random_state:
-    values:
-    - 1024
-program: train.py
+    distribution: int_uniform
+    max: 14
+    min: 7
+program: train_lda.py
