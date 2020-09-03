@@ -1,14 +1,11 @@
-import sys
 import os
-import re
-import argparse
+import sys
 import logging
 logging.basicConfig(
     format='%(asctime)s : %(levelname)s : %(message)s', 
     level=logging.INFO)
 
 import wandb
-import pandas as pd
 import utils
 
 import gensim
@@ -123,27 +120,10 @@ def train(passes=1, iterations=50, num_topics=100, decay=0.5, offset=1.0, chunks
     return lm, corpus, dictionary
 
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--alpha", type=str)
-    parser.add_argument("--chunksize", type=int)
-    parser.add_argument("--decay", type=float)
-    parser.add_argument("--eta", type=str)
-    parser.add_argument("--iterations", type=int)
-    parser.add_argument("--no_above", type=float)
-    parser.add_argument("--no_below", type=int)
-    parser.add_argument("--num_topics", type=int)
-    parser.add_argument("--offset", type=int)
-    parser.add_argument("--passes", type=int)
-    parser.add_argument("--random_state", type=int)
-    parser.add_argument("--minimum_probability", type=float)
-    return parser.parse_args()
-
-
 def main():
     hyperparameters = get_hyperparameters()
     if len(sys.argv) > 1:
-        args = vars(parse_args())
+        args = vars(utils.parse_args())
         args = {k: v for k, v in args.items() if v is not None}
         hyperparameters.update(args)
 

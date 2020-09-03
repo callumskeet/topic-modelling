@@ -1,5 +1,8 @@
 import os
+import argparse
+
 import pandas as pd
+
 import gensim
 from gensim.corpora import Dictionary
 
@@ -88,3 +91,20 @@ def get_text_inputs_from_folder(directory):
 
     dictionary = Dictionary.load(os.path.join('model', 'dictionary.pkl'))
     return train_texts, bigram, dictionary
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--alpha", type=str)
+    parser.add_argument("--chunksize", type=int)
+    parser.add_argument("--decay", type=float)
+    parser.add_argument("--eta", type=str)
+    parser.add_argument("--iterations", type=int)
+    parser.add_argument("--no_above", type=float)
+    parser.add_argument("--no_below", type=int)
+    parser.add_argument("--num_topics", type=int)
+    parser.add_argument("--offset", type=int)
+    parser.add_argument("--passes", type=int)
+    parser.add_argument("--random_state", type=int)
+    parser.add_argument("--minimum_probability", type=float)
+    return parser.parse_args()
